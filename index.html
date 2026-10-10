@@ -43,7 +43,9 @@ nav a.cta{background:var(--dk);color:var(--cr)}
 .burger{display:none;position:absolute;right:16px;top:calc(18px + env(safe-area-inset-top,0px));width:44px;height:44px;border:0;background:none;cursor:pointer}
 .burger i{display:block;width:24px;height:2px;background:var(--dk);margin:6px auto;transition:.3s}
 @media(max-width:560px){
-  .logo{font-size:clamp(1.15rem,5.2vw,1.55rem);white-space:nowrap;letter-spacing:0}
+  .bar{position:relative;min-height:44px;align-items:center;padding-right:52px}
+  .logo{font-size:clamp(1.05rem,4.6vw,1.4rem);white-space:nowrap;letter-spacing:0;line-height:1.2}
+  .burger{top:50%;right:16px;transform:translateY(-50%)}
 }
 @media(max-width:900px){
  .bar{flex-direction:row;justify-content:flex-start}
