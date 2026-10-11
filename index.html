@@ -108,6 +108,12 @@ nav a.cta{background:var(--dk);color:var(--cr)}
 .gal{position:relative;border-radius:var(--r) 18px 18px var(--r);overflow:hidden;background:var(--sd)}
 .gal .slot{position:absolute;inset:0;opacity:0;transform:scale(1.06);transition:opacity .7s ease,transform .9s ease;pointer-events:none}
 .gal .slot.on{opacity:1;transform:none}
+
+.gal-controls{position:absolute;inset:0;display:flex;align-items:center;justify-content:space-between;padding:0 12px;z-index:5;pointer-events:none}
+.gal-control{pointer-events:auto;width:38px;height:38px;border:1px solid var(--sd);border-radius:50%;background:rgba(65,67,27,.72);color:var(--cr);font:inherit;font-size:1.35rem;line-height:1;display:grid;place-items:center;cursor:pointer;transition:background .25s,opacity .25s}
+.gal-control:hover{background:var(--dk)}
+.gal-control[hidden]{display:none}
+
 @media(max-width:860px){
  .pf{grid-template-columns:minmax(0,1fr);gap:18px;padding:24px 0}
  .pf h2{margin-bottom:12px;font-size:clamp(1.65rem,7vw,2.1rem)}
@@ -305,11 +311,12 @@ footer{background:var(--dk);color:var(--sd);text-align:center;padding:22px 16px;
 <script>
 /* ADD YOUR IMAGES HERE – paste a file path or URL. Any size/ratio works (cropped to fit). */
 const IMG={hero:'',about:'images/About_me.jpeg',class1:'',class2:''};
+// Add any number of image paths per category, e.g. images:['images/portrait1.jpg','images/portrait2.jpg'].
 const PORTFOLIO=[
- {name:'Bridal Mehndi – Portrait',title:'Portrait',img:'',price:'Price on request – call +91 9904414989',desc:'Lifelike portraits of the bride and groom, drawn by hand in fine henna lines as part of the bridal design.'},
- {name:'Bridal Mehndi – Figures',title:'Figures',img:'',price:'Price on request – call +91 9904414989',desc:'Traditional figures such as dulha-dulhan, doli and kahar, woven through intricate bridal patterns.'},
- {name:'Engagement',title:'Engagement',img:'',price:'Price on request – call +91 9904414989',desc:'Elegant, detailed designs made for engagement ceremonies and pre-wedding celebrations.'},
- {name:'Baby Shower',title:'Baby Shower',img:'',price:'Price on request – call +91 9904414989',desc:'Graceful, joyful mehndi to celebrate the mother-to-be at her baby shower.'}
+ {name:'Bridal Mehndi – Portrait',title:'Portrait',images:[],price:'Price on request – call +91 9904414989',desc:'Lifelike portraits of the bride and groom, drawn by hand in fine henna lines as part of the bridal design.'},
+ {name:'Bridal Mehndi – Figures',title:'Figures',images:[],price:'Price on request – call +91 9904414989',desc:'Traditional figures such as dulha-dulhan, doli and kahar, woven through intricate bridal patterns.'},
+ {name:'Engagement',title:'Engagement',images:[],price:'Price on request – call +91 9904414989',desc:'Elegant, detailed designs made for engagement ceremonies and pre-wedding celebrations.'},
+ {name:'Baby Shower',title:'Baby Shower',images:[],price:'Price on request – call +91 9904414989',desc:'Graceful, joyful mehndi to celebrate the mother-to-be at her baby shower.'}
 ];
 const CLIENTS=[{n:'Client name',i:''},{n:'Client name',i:''},{n:'Client name',i:''},{n:'Client name',i:''}];
 
@@ -323,19 +330,46 @@ $('#clientGrid').innerHTML=CLIENTS.map(c=>`<article class="client rv">${slot(c.i
 /* portfolio */
 const cats=$('.cats'),gal=$('#gal'),copy=$('#copy'),pv=$('#pval'),pb=$('#pbtn');
 cats.innerHTML=PORTFOLIO.map((p,i)=>`<li><button role="tab" aria-selected="${i==0}" data-i="${i}">${p.name}</button></li>`).join('');
-gal.innerHTML=PORTFOLIO.map((p,i)=>slot(p.img,p.name,'Add '+p.title+' image').replace('class="slot"',`class="slot${i==0?' on':''}"`)).join('');
+gal.innerHTML='<div class="gal-controls"><button class="gal-control" id="galPrev" type="button" aria-label="Previous image">‹</button><button class="gal-control" id="galNext" type="button" aria-label="Next image">›</button></div>';
+const galPrev=$('#galPrev'),galNext=$('#galNext');
+let cur=0,t,imageIndex=0;
+function imagesFor(p){
+ const list=Array.isArray(p.images)?p.images:(p.img?[p.img]:[]);
+ return list.filter(src=>typeof src==='string'&&src.trim()!=='');
+}
+function renderGallery(){
+ const p=PORTFOLIO[cur],images=imagesFor(p);
+ gal.querySelectorAll('.slot').forEach(el=>el.remove());
+ const controls=gal.querySelector('.gal-controls');
+ images.forEach((src,i)=>{
+   const el=document.createElement('div');
+   el.className='slot'+(i===imageIndex?' on':'');
+   const img=document.createElement('img');img.src=src;img.alt=(p.title||p.name)+' — image '+(i+1);
+   el.appendChild(img);gal.insertBefore(el,controls);
+ });
+ const hasMultiple=images.length>1;
+ galPrev.hidden=!hasMultiple;galNext.hidden=!hasMultiple;
+ gal.setAttribute('aria-label',images.length?`${p.title}: image ${imageIndex+1} of ${images.length}`:'Portfolio images not added yet');
+}
+function moveImage(step){
+ const images=imagesFor(PORTFOLIO[cur]);
+ if(images.length<2)return;
+ imageIndex=(imageIndex+step+images.length)%images.length;
+ renderGallery();
+}
+galPrev.addEventListener('click',()=>moveImage(-1));
+galNext.addEventListener('click',()=>moveImage(1));
 $('#ct').textContent='/0'+PORTFOLIO.length;
-let cur=0,t;
 function show(i){
- if(i===cur&&copy.dataset.ready)return;copy.dataset.ready=1;cur=i;
+ if(i===cur&&copy.dataset.ready)return;copy.dataset.ready=1;cur=i;imageIndex=0;
  cats.querySelectorAll('button').forEach((b,k)=>b.setAttribute('aria-selected',k==i));
- gal.querySelectorAll('.slot').forEach((s,k)=>s.classList.toggle('on',k==i));
+ renderGallery();
  copy.classList.add('swap');clearTimeout(t);
  t=setTimeout(()=>{const p=PORTFOLIO[i];$('#cn').textContent='0'+(i+1);$('#ctitle').textContent=p.title;$('#cdesc').textContent=p.desc;pv.textContent=p.price;pv.classList.remove('show');pb.setAttribute('aria-expanded','false');copy.classList.remove('swap')},320);
 }
 cats.addEventListener('click',e=>{const b=e.target.closest('button');if(b)show(+b.dataset.i)});
 pb.onclick=()=>{const o=pv.classList.toggle('show');pb.setAttribute('aria-expanded',o)};
-(()=>{const p=PORTFOLIO[0];$('#ctitle').textContent=p.title;$('#cdesc').textContent=p.desc;pv.textContent=p.price})();
+(()=>{const p=PORTFOLIO[0];renderGallery();$('#ctitle').textContent=p.title;$('#cdesc').textContent=p.desc;pv.textContent=p.price})();
 
 /* mobile menu */
 const hd=$('header'),bg=$('.burger'),nv=$('nav');
