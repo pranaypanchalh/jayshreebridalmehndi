@@ -106,13 +106,22 @@ nav a.cta{background:var(--dk);color:var(--cr)}
 .price{font-size:.9rem;margin-top:12px;max-height:0;overflow:hidden;opacity:0;transition:.4s}
 .price.show{max-height:60px;opacity:1}
 .gal{position:relative;border-radius:var(--r) 18px 18px var(--r);overflow:hidden;background:var(--sd)}
-.gal .slot{position:absolute;inset:0;opacity:0;transform:scale(1.06);transition:opacity .7s ease,transform .9s ease;pointer-events:none}
-.gal .slot.on{opacity:1;transform:none}
-
+.gal .track{position:absolute;inset:0;display:flex;touch-action:pan-y;cursor:grab;transition:transform .55s cubic-bezier(.22,.8,.25,1);will-change:transform;animation:galIn .5s ease}
+.gal .track.drag{transition:none;cursor:grabbing}
+@keyframes galIn{from{opacity:0}to{opacity:1}}
+.gal .slide{flex:0 0 100%;min-width:0;height:100%;position:relative;overflow:hidden;background:var(--sd);display:grid;place-items:center;font-size:.85rem;color:var(--dk)}
+.gal .slide img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center;pointer-events:none;user-select:none;-webkit-user-drag:none}
+.gal .slide span{opacity:.55}
 .gal-controls{position:absolute;inset:0;display:flex;align-items:center;justify-content:space-between;padding:0 12px;z-index:5;pointer-events:none}
-.gal-control{pointer-events:auto;width:38px;height:38px;border:1px solid var(--sd);border-radius:50%;background:rgba(65,67,27,.72);color:var(--cr);font:inherit;font-size:1.35rem;line-height:1;display:grid;place-items:center;cursor:pointer;transition:background .25s,opacity .25s}
-.gal-control:hover{background:var(--dk)}
+.gal-control{pointer-events:auto;width:40px;height:40px;padding:0;margin:0;border:1px solid var(--sd);border-radius:50%;background:rgba(65,67,27,.72);color:var(--cr);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background .25s,opacity .25s,transform .25s}
+.gal-control svg{width:18px;height:18px;display:block;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.gal-control:hover{background:var(--dk);transform:scale(1.08)}
+.gal-control:disabled{opacity:.3;cursor:default;transform:none}
 .gal-control[hidden]{display:none}
+.dots{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);display:flex;gap:7px;padding:7px 11px;border-radius:99px;background:rgba(65,67,27,.55);z-index:5}
+.dots[hidden]{display:none}
+.dots i{width:7px;height:7px;border-radius:50%;background:var(--sd);opacity:.45;transition:.3s}
+.dots i.on{opacity:1;width:20px;border-radius:99px}
 
 @media(max-width:860px){
  .pf{grid-template-columns:minmax(0,1fr);gap:18px;padding:24px 0}
@@ -330,35 +339,67 @@ $('#clientGrid').innerHTML=CLIENTS.map(c=>`<article class="client rv">${slot(c.i
 /* portfolio */
 const cats=$('.cats'),gal=$('#gal'),copy=$('#copy'),pv=$('#pval'),pb=$('#pbtn');
 cats.innerHTML=PORTFOLIO.map((p,i)=>`<li><button role="tab" aria-selected="${i==0}" data-i="${i}">${p.name}</button></li>`).join('');
-gal.innerHTML='<div class="gal-controls"><button class="gal-control" id="galPrev" type="button" aria-label="Previous image">‹</button><button class="gal-control" id="galNext" type="button" aria-label="Next image">›</button></div>';
-const galPrev=$('#galPrev'),galNext=$('#galNext');
-let cur=0,t,imageIndex=0;
+const CH_L='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>',CH_R='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>';
+gal.tabIndex=0;
+gal.innerHTML='<div class="gal-controls"><button class="gal-control" id="galPrev" type="button" aria-label="Previous image">'+CH_L+'</button><button class="gal-control" id="galNext" type="button" aria-label="Next image">'+CH_R+'</button></div><div class="dots" id="galDots"></div>';
+const galPrev=$('#galPrev'),galNext=$('#galNext'),galDots=$('#galDots');
+let cur=0,t,imageIndex=0,track=null,count=0;
 function imagesFor(p){
  const list=Array.isArray(p.images)?p.images:(p.img?[p.img]:[]);
  return list.filter(src=>typeof src==='string'&&src.trim()!=='');
 }
 function renderGallery(){
- const p=PORTFOLIO[cur],images=imagesFor(p);
- gal.querySelectorAll('.slot').forEach(el=>el.remove());
- const controls=gal.querySelector('.gal-controls');
+ const p=PORTFOLIO[cur],images=imagesFor(p);count=images.length;
+ if(track)track.remove();
+ track=document.createElement('div');track.className='track';
+ if(!count){track.innerHTML='<div class="slide empty"><span>Add images</span></div>'}
  images.forEach((src,i)=>{
-   const el=document.createElement('div');
-   el.className='slot'+(i===imageIndex?' on':'');
-   const img=document.createElement('img');img.src=src;img.alt=(p.title||p.name)+' — image '+(i+1);
-   el.appendChild(img);gal.insertBefore(el,controls);
+  const sl=document.createElement('div');sl.className='slide';
+  const img=document.createElement('img');img.src=src;img.alt=(p.title||p.name)+' \u2014 image '+(i+1);img.draggable=false;img.decoding='async';if(i>1)img.loading='lazy';
+  sl.appendChild(img);track.appendChild(sl);
  });
- const hasMultiple=images.length>1;
- galPrev.hidden=!hasMultiple;galNext.hidden=!hasMultiple;
- gal.setAttribute('aria-label',images.length?`${p.title}: image ${imageIndex+1} of ${images.length}`:'Portfolio images not added yet');
+ gal.insertBefore(track,gal.firstChild);
+ galDots.innerHTML=images.map(()=>'<i></i>').join('');
+ galDots.hidden=galPrev.hidden=galNext.hidden=count<2;
+ bindDrag();update(false);
 }
-function moveImage(step){
- const images=imagesFor(PORTFOLIO[cur]);
- if(images.length<2)return;
- imageIndex=(imageIndex+step+images.length)%images.length;
- renderGallery();
+function update(animate=true){
+ if(!track)return;
+ imageIndex=Math.max(0,Math.min(imageIndex,Math.max(count-1,0)));
+ if(!animate)track.style.transition='none';
+ track.style.transform='translateX('+(-imageIndex*100)+'%)';
+ if(!animate){track.offsetWidth;track.style.transition=''}
+ galDots.querySelectorAll('i').forEach((d,k)=>d.classList.toggle('on',k===imageIndex));
+ galPrev.disabled=imageIndex===0;galNext.disabled=imageIndex>=count-1;
+ const p=PORTFOLIO[cur];
+ gal.setAttribute('aria-label',count?p.title+': image '+(imageIndex+1)+' of '+count:'Portfolio images not added yet');
+}
+function moveImage(step){if(count<2)return;imageIndex+=step;update()}
+function bindDrag(){
+ if(count<2)return;
+ let sx=0,dx=0,t0=0,on=false,w=1;
+ track.addEventListener('pointerdown',e=>{
+  if(e.pointerType==='mouse'&&e.button!==0)return;
+  on=true;sx=e.clientX;dx=0;t0=Date.now();w=gal.clientWidth||1;
+  track.classList.add('drag');track.setPointerCapture(e.pointerId);
+ });
+ track.addEventListener('pointermove',e=>{
+  if(!on)return;dx=e.clientX-sx;
+  let d=dx;if((imageIndex===0&&dx>0)||(imageIndex===count-1&&dx<0))d=dx*.3;
+  track.style.transform='translateX(calc('+(-imageIndex*100)+'% + '+d+'px))';
+ });
+ const end=()=>{
+  if(!on)return;on=false;track.classList.remove('drag');
+  const v=Math.abs(dx)/Math.max(Date.now()-t0,1);
+  if(Math.abs(dx)>w*.15||(v>.45&&Math.abs(dx)>30))imageIndex+=dx<0?1:-1;
+  update();
+ };
+ track.addEventListener('pointerup',end);
+ track.addEventListener('pointercancel',end);
 }
 galPrev.addEventListener('click',()=>moveImage(-1));
 galNext.addEventListener('click',()=>moveImage(1));
+gal.addEventListener('keydown',e=>{if(e.key==='ArrowLeft')moveImage(-1);if(e.key==='ArrowRight')moveImage(1)});
 $('#ct').textContent='/0'+PORTFOLIO.length;
 function show(i){
  if(i===cur&&copy.dataset.ready)return;copy.dataset.ready=1;cur=i;imageIndex=0;
